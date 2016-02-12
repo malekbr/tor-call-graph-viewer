@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    <script src="https://d3js.org/d3.v3.min.js"></script>
+    <script type="text/javascript">
+      var diameter = 960,
+          radius = diameter/2,
+          inner_radius = radius - 120;
+
+      var cluster = d3.layout.cluster()
+        .size([360, inner_radius])
+        .sort(null)
+        .value(function (d){ return d.size()});
+
+      var bundle = d3.layout.bundle();
+
+      var line = d3.svg.line.radial()
+          .interpolate("bundle")
+          .tension(.85)
+          .radius(function(d) { return d.y; })
+          .angle(function(d) { return d.x / 180 * Math.PI; });
+
+      var svg = d3.select("body").append("svg")
+          .attr("width", diameter)
+          .attr("height", diameter)
+        .append("g")
+          .attr("transform", "translate(" + radius + "," + radius + ")");
+
+      var link = svg.append("g").selectAll(".link"),
+          node = svg.append("g").selectAll(".node");
+
+      d3.json("callgrah_data.json", function(error, functions) {
+        if (error) throw error;
+
+        var nodes = cluster.nodes(functionHierarchy(functions)),
+            links = functionCalls(nodes);
+
+        link = link
+            .data(bundle(links))
+          .enter().append("path")
+            .each(function(d) { d.source = d[0], d.target = d[d.length - 1]; })
+            .attr("class", "link")
+            .attr("d", line);
+
+        node = node
+            .data(nodes.filter(function(n) { return !n.children; }))
+          .enter().append("text")
+            .attr("class", "node")
+            .attr("dy", ".31em")
+            .attr("transform", function(d) { return "rotate(" + (d.x - 90) + ")translate(" + (d.y + 8) + ",0)" + (d.x < 180 ? "" : "rotate(180)"); })
+            .style("text-anchor", function(d) { return d.x < 180 ? "start" : "end"; })
+            .text(function(d) { return d.key; })
+            .on("mouseover", mouseovered)
+            .on("mouseout", mouseouted);
+      });
+
+      function mouseovered(d) {
+        node
+            .each(function(n) { n.target = n.source = false; });
+
+        link
+            .classed("link--target", function(l) { if (l.target === d) return l.source.source = true; })
+            .classed("link--source", function(l) { if (l.source === d) return l.target.target = true; })
+          .filter(function(l) { return l.target === d || l.source === d; })
+            .each(function() { this.parentNode.appendChild(this); });
+
+        node
+            .classed("node--target", function(n) { return n.target; })
+            .classed("node--source", function(n) { return n.source; });
+      }
+
+      function mouseouted(d) {
+        link
+            .classed("link--target", false)
+            .classed("link--source", false);
+
+        node
+            .classed("node--target", false)
+            .classed("node--source", false);
+      }
+
+      d3.select(self.frameElement).style("height", diameter + "px");
+
+      // constructs hierarchy of functions
+      // TODO extract filenames and use them for hierarchy
+      function functionHierarchy(functions) {
+        var map = {};
+        functions.forEach(function (fn) {
+          map[fn.name] = fn;
+        });
+        return map;
+      }
+
+      // Return a list of imports for the given array of nodes.
+      function functionCalls(nodes) {
+        var map = {},
+          calls = [];
+
+        // Compute a map from name to node.
+        nodes.forEach(function(d) {
+          map[d.name] = d;
+        });
+
+        // For each import, construct a link from the source to target node.
+        nodes.forEach(function(d) {
+          if (d.calls) d.calls.forEach(function(callee) {
+            calls.push({source: map[d.name], target: map[callee]});
+          });
+        });
+
+        return calls;
+      }
+
+    </script>
+  </head>
+  <body>
+
+  </body>
+</html>
