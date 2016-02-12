@@ -134,9 +134,11 @@
       // constructs hierarchy of functions
       // TODO extract filenames and use them for hierarchy
       function functionHierarchy(functions) {
-        var map = {};
+        var map = {"": {name:"", children:[]}};
         functions.forEach(function (fn) {
           map[fn.name] = fn;
+          map[""].children.push(fn);
+          fn.parent = map[""];
         });
         return map;
       }
